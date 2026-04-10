@@ -1,5 +1,7 @@
 import { TableRenderer } from './renderer/renderer';
+import { InteractionManager } from './interaction/manager';
 import { DEFAULT_TABLE_CONFIG } from './constants';
+import { bus } from './events';
 import type { TableState } from './types';
 
 const canvas = document.getElementById('table-canvas') as HTMLCanvasElement;
@@ -17,9 +19,38 @@ const tableState: TableState = {
   ],
 };
 
+const interaction = new InteractionManager(canvas, renderer, tableState);
+
+let currentAimLine: { fromX: number; fromY: number; toX: number; toY: number } | undefined;
+
+bus.on('ball-moved', () => requestRender());
+bus.on('ball-placed', () => requestRender());
+bus.on('aim-changed', (data: { angle: number; targetX: number; targetY: number }) => {
+  const cueBall = tableState.balls.find((b) => b.type === 'cue');
+  if (cueBall) {
+    currentAimLine = {
+      fromX: cueBall.x, fromY: cueBall.y,
+      toX: data.targetX, toY: data.targetY,
+    };
+  }
+  requestRender();
+});
+
+let renderPending = false;
+function requestRender(): void {
+  if (renderPending) return;
+  renderPending = true;
+  requestAnimationFrame(() => {
+    renderer.render(tableState, undefined, currentAimLine);
+    renderPending = false;
+  });
+}
+
 renderer.render(tableState);
+
+void interaction;
 
 window.addEventListener('resize', () => {
   renderer.resize();
-  renderer.render(tableState);
+  requestRender();
 });
