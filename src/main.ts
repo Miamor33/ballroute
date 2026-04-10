@@ -1,10 +1,16 @@
 import { TableRenderer } from './renderer/renderer';
 import { InteractionManager } from './interaction/manager';
+import { Toolbar } from './ui/toolbar';
+import { CueSelector } from './ui/cue-selector';
+import { ForceSlider } from './ui/force-slider';
+import { ResultPanel } from './ui/result-panel';
+import { forwardSimulate } from './analyzer/forward';
 import { DEFAULT_TABLE_CONFIG } from './constants';
 import { bus } from './events';
-import type { TableState } from './types';
+import type { TableState, SimulationResult } from './types';
 
 const canvas = document.getElementById('table-canvas') as HTMLCanvasElement;
+const uiRoot = document.getElementById('ui-root')!;
 const renderer = new TableRenderer(canvas);
 
 const tableState: TableState = {
@@ -21,18 +27,32 @@ const tableState: TableState = {
 
 const interaction = new InteractionManager(canvas, renderer, tableState);
 
-let currentAimLine: { fromX: number; fromY: number; toX: number; toY: number } | undefined;
+const toolbar = new Toolbar(uiRoot);
+void toolbar;
+const cueSelector = new CueSelector(document.getElementById('cue-selector-mount')!);
+const forceSlider = new ForceSlider(document.getElementById('force-slider-mount')!);
+const resultPanel = new ResultPanel(uiRoot);
+void resultPanel;
 
-bus.on('ball-moved', () => requestRender());
+let currentAimLine: { fromX: number; fromY: number; toX: number; toY: number } | undefined;
+let currentSimResult: SimulationResult | undefined;
+
+bus.on('ball-moved', () => { currentSimResult = undefined; requestRender(); });
 bus.on('ball-placed', () => requestRender());
 bus.on('aim-changed', (data: { angle: number; targetX: number; targetY: number }) => {
   const cueBall = tableState.balls.find((b) => b.type === 'cue');
   if (cueBall) {
-    currentAimLine = {
-      fromX: cueBall.x, fromY: cueBall.y,
-      toX: data.targetX, toY: data.targetY,
-    };
+    currentAimLine = { fromX: cueBall.x, fromY: cueBall.y, toX: data.targetX, toY: data.targetY };
   }
+  requestRender();
+});
+
+bus.on('simulate-requested', () => {
+  const { offsetX, offsetY } = cueSelector.getOffset();
+  const force = forceSlider.getForce();
+  const aimAngle = interaction.getAimAngle();
+
+  currentSimResult = forwardSimulate(tableState, { aimAngle, offsetX, offsetY, force });
   requestRender();
 });
 
@@ -41,16 +61,10 @@ function requestRender(): void {
   if (renderPending) return;
   renderPending = true;
   requestAnimationFrame(() => {
-    renderer.render(tableState, undefined, currentAimLine);
+    renderer.render(tableState, currentSimResult, currentAimLine);
     renderPending = false;
   });
 }
 
 renderer.render(tableState);
-
-void interaction;
-
-window.addEventListener('resize', () => {
-  renderer.resize();
-  requestRender();
-});
+window.addEventListener('resize', () => { renderer.resize(); requestRender(); });
