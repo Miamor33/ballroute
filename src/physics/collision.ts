@@ -37,6 +37,9 @@ export function resolveBallBallCollision(
     y: a.y - separationY,
     vx: a.vx + j * nx,
     vy: a.vy + j * ny,
+    wx: a.wx,
+    wy: a.wy,
+    wz: a.wz,
   };
 
   const rb: BallState = {
@@ -45,6 +48,9 @@ export function resolveBallBallCollision(
     y: b.y + separationY,
     vx: b.vx - j * nx,
     vy: b.vy - j * ny,
+    wx: b.wx,
+    wy: b.wy,
+    wz: b.wz,
   };
 
   return [ra, rb];
