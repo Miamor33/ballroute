@@ -4,8 +4,10 @@ import { Toolbar } from './ui/toolbar';
 import { CueSelector } from './ui/cue-selector';
 import { ForceSlider } from './ui/force-slider';
 import { ResultPanel } from './ui/result-panel';
+import { TVOverlay } from './ui/overlay';
 import { forwardSimulate } from './analyzer/forward';
 import { reverseAnalyze } from './analyzer/reverse';
+import { getCueLabel } from './analyzer/cue-mapping';
 import { DEFAULT_TABLE_CONFIG } from './constants';
 import { bus } from './events';
 import type { TableState, SimulationResult } from './types';
@@ -30,10 +32,12 @@ const interaction = new InteractionManager(canvas, renderer, tableState);
 void interaction;
 
 const toolbar = new Toolbar(uiRoot);
-void toolbar;
 const cueSelector = new CueSelector(document.getElementById('cue-selector-mount')!);
 const forceSlider = new ForceSlider(document.getElementById('force-slider-mount')!);
 const resultPanel = new ResultPanel(uiRoot);
+const tvOverlay = new TVOverlay(uiRoot);
+void toolbar;
+void resultPanel;
 
 let currentAimLine: { fromX: number; fromY: number; toX: number; toY: number } | undefined;
 let currentSimResult: SimulationResult | undefined;
@@ -79,6 +83,18 @@ canvas.addEventListener('click', (e) => {
     resultPanel.show(options);
     requestRender();
   }
+});
+
+// TV overlay updates
+bus.on('cue-offset-changed', (data: { offsetX: number; offsetY: number }) => {
+  const label = getCueLabel(data.offsetX, data.offsetY);
+  tvOverlay.updateInfo(label, forceSlider.getForce());
+});
+
+bus.on('force-changed', (data: { force: number }) => {
+  const { offsetX, offsetY } = cueSelector.getOffset();
+  const label = getCueLabel(offsetX, offsetY);
+  tvOverlay.updateInfo(label, data.force);
 });
 
 let renderPending = false;
