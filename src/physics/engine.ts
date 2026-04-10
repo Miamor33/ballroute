@@ -5,7 +5,8 @@ import { detectBallBallCollision, resolveBallBallCollision, detectCushionCollisi
 import { detectPocket } from './pocket';
 
 export class PhysicsEngine {
-  constructor(private config: TableConfig) {}
+  private config: TableConfig;
+  constructor(config: TableConfig) { this.config = config; }
 
   simulate(initialBalls: BallState[]): SimulationResult {
     const trajectories = new Map<number, TrajectoryPoint[]>();
