@@ -5,6 +5,7 @@ import { CueSelector } from './ui/cue-selector';
 import { ForceSlider } from './ui/force-slider';
 import { ResultPanel } from './ui/result-panel';
 import { forwardSimulate } from './analyzer/forward';
+import { reverseAnalyze } from './analyzer/reverse';
 import { DEFAULT_TABLE_CONFIG } from './constants';
 import { bus } from './events';
 import type { TableState, SimulationResult } from './types';
@@ -26,16 +27,17 @@ const tableState: TableState = {
 };
 
 const interaction = new InteractionManager(canvas, renderer, tableState);
+void interaction;
 
 const toolbar = new Toolbar(uiRoot);
 void toolbar;
 const cueSelector = new CueSelector(document.getElementById('cue-selector-mount')!);
 const forceSlider = new ForceSlider(document.getElementById('force-slider-mount')!);
 const resultPanel = new ResultPanel(uiRoot);
-void resultPanel;
 
 let currentAimLine: { fromX: number; fromY: number; toX: number; toY: number } | undefined;
 let currentSimResult: SimulationResult | undefined;
+let analysisMode: 'forward' | 'reverse-click' = 'forward';
 
 bus.on('ball-moved', () => { currentSimResult = undefined; requestRender(); });
 bus.on('ball-placed', () => requestRender());
@@ -54,6 +56,29 @@ bus.on('simulate-requested', () => {
 
   currentSimResult = forwardSimulate(tableState, { aimAngle, offsetX, offsetY, force });
   requestRender();
+});
+
+bus.on('mode-change', (data: { mode: string }) => {
+  if (data.mode === 'reverse-click') {
+    analysisMode = 'reverse-click';
+  } else {
+    analysisMode = 'forward';
+  }
+});
+
+canvas.addEventListener('click', (e) => {
+  if (analysisMode !== 'reverse-click') return;
+  const pos = renderer.screenToTable(e.clientX, e.clientY);
+  const aimAngle = interaction.getAimAngle();
+  const options = reverseAnalyze(tableState, aimAngle, pos);
+  if (options.length > 0) {
+    currentSimResult = {
+      trajectories: new Map([[0, options[0].trajectory]]),
+      events: [],
+    };
+    resultPanel.show(options);
+    requestRender();
+  }
 });
 
 let renderPending = false;
